@@ -1,21 +1,22 @@
 #define magnet 7
 #define sensor 9
 
-volatile bool ballSensed = false;
+bool ballSensed = false;
 int ballCount = 0;
 
 void setup() {
   // put your setup code here, to run once:
   pinMode(magnet, OUTPUT);
+  digitalWrite(magnet, HIGH);
   pinMode(sensor, INPUT_PULLUP);
-  attachInterrupt(digitalPinToInterrupt(sensor), checkForBall, LOW);
+
+  attachInterrupt(digitalPinToInterrupt(sensor), magnetOn, FALLING);
+
+  setupWatchdog();
 
   // init serial monitor
   Serial.begin(9600);
   while(!Serial);
-
-  setupWatchdog();
-
   Serial.println("system ready");
 }
 
@@ -48,29 +49,19 @@ void petWatchdog() {
 
 void loop() {
   // put your main code here, to run repeatedly:
-  magnetOn();
   updateBallCount();
   petWatchdog();
 }
 
-void checkForBall() {
-  if (!ballSensed) {
-    ballSensed = true;
-  }
-}
-
 void magnetOn() {
-  if (ballSensed) {
-    // turn magnet on
-    digitalWrite(magnet, HIGH);
-    Serial.println("HIGH");
-    delay(500);
+  // turn magnet on
+  analogWrite(magnet, 0);
+  delayMicroseconds(16 * 1000);
 
-    // turn magnet off
-    digitalWrite(magnet, LOW);
-    Serial.println("LOW");
-    delay(500);
-  }
+  // turn magnet off
+  analogWrite(magnet, 255);
+  Serial.println("FIRED");
+  ballSensed = true;
 }
 
 void updateBallCount() {
