@@ -6,13 +6,23 @@
 
 Servo servo;
 
+// pin numbers
 #define magnet 7
 #define sensor 8
 #define buzzer 5
 #define servoPin 10
 
-bool ballSensed = false;
-int ballCount = 0;
+#define MAGNET_DURATION 16 // duration that magnet should be on in ms
+
+// reflects if the inductive sensor detected a ball (T == detected; F == no detection)
+static volatile bool ballSensed = false;
+
+// FSM States
+typedef enum {
+  sWAIT_FOR_BALL = 1,
+  sELECTROMAGNET_ON = 2,
+  sSYSTEM_OFF = 3,
+} state;
 
 int notes[] = {
   NOTE_B4, NOTE_A4, NOTE_G4, 
@@ -38,11 +48,13 @@ void setup() {
   ArduinoCloud.begin(ArduinoIoTPreferredConnection);
   
   pinMode(magnet, OUTPUT);
-  analogWrite(magnet, 255);
+  toggleMagnet(false); // magnet starts off
+
   pinMode(sensor, INPUT_PULLUP);
-  attachInterrupt(digitalPinToInterrupt(sensor), magnetOn, FALLING);
+  attachInterrupt(digitalPinToInterrupt(sensor), sensorChanged, CHANGE);
 
   servo.attach(servoPin);
+
   pinMode(buzzer, OUTPUT);
   
   setupWatchdog();
@@ -80,58 +92,99 @@ void petWatchdog() {
   WDT->CLEAR.reg = 0xA5;
 }
 
-void loop() {
-  ArduinoCloud.update();
-  // Your code here
-  if (perpetualMotionMachine) {
-    updateBallCount();
-    
-    if (musicEnabled && ballSensed) {
-      // Add your code here to act upon Melody change
-      int size = sizeof(durations) / sizeof(int);
-      //to calculate the note duration, take one second divided by the note type.
-      //e.g. quarter note = 1000 / 4, eighth note = 1000/8, etc.
-      int duration = 1000 / durations[ballCount - 1];
-      tone(buzzer, notes[ballCount - 1], duration);
-  
-      //to distinguish the notes, set a minimum time between them.
-      //the note's duration + 30% seems to work well:
-      int pauseBetweenNotes = duration * 1.30;
-      delay(pauseBetweenNotes);
-      
-      //stop the tone playing:
-      noTone(buzzer);
-      ballSensed = false;
-      if (ballCount == size) {
-        ballCount = 0;
-      }
-    }
-    
-    petWatchdog();
+// ISR called when sensor changes
+void sensorChanged() {
+  // NOTE: sensor is HIGH when no ball is detected, LOW when ball is detected
+  PinStatus curSignal = digitalRead(sensor);
+  if (curSignal == HIGH) {
+    // rising edge, ball leaves sensor range
+    ballSensed = false;
+  } else if (curSignal == LOW) {
+    // falling edge, ball enters sensor range
+    ballSensed = true;
+  } else {
+    // should never happen
+    Serial.print("unexpected sensor read of ");
+    Serial.println(curSignal);
   }
 }
 
-state updateFSM(state curState, long mils, bool isOn, bool musicEnabled, bool sensorInput) {
-
+void loop() {
+  static state CURRENT_STATE = sWAIT_FOR_BALL;
+  // update inputs from cloud
+  ArduinoCloud.update();
+  updateFSM(CURRENT_STATE, millis(), perpetualMotionMachine, ballSensed);   
+  petWatchdog();
 }
 
-void magnetOn() {
-  // turn magnet on
-  analogWrite(magnet, 0);
-  delayMicroseconds(16 * 1000);
+state updateFSM(state curState, long mils, CloudSwitch isOn, bool ballSensed) {
+  static long savedClock = mils;
+  state nextState;
+  switch(curState) {
+    case sWAIT_FOR_BALL:
+      if (!isOn) {
+        // 1-3: turn system off
+        nextState = sSYSTEM_OFF;
+      }
+      if (ballSensed && isOn) {
+        // 1-2: ball sensed, turn magnet on
+        // turn magnet on
+        toggleMagnet(true);
+        nextState = sELECTROMAGNET_ON;
+        // reset savedClock
+        savedClock = mils;
+        // play next note
+        playNote();
+      }
+    case sELECTROMAGNET_ON:
+      if ((mils - savedClock) >= MAGNET_DURATION) {
+        // 2-1: magnet has been on long enough, turn it off
+        toggleMagnet(false);
+        nextState = sWAIT_FOR_BALL;
+      }
+    case sSYSTEM_OFF:
+      if (isOn) {
+        // 3-1: system toggled back on
+        nextState = sWAIT_FOR_BALL;
+      }
+  }
 
-  // turn magnet off
-  analogWrite(magnet, 255);
-  Serial.println("FIRED");
-  ballSensed = true;
+  return nextState;
 }
 
-void updateBallCount() {
-  if (ballSensed) {
-    // update variables and print ball count
-    ballCount += 1;
-    Serial.print("ball ");
-    Serial.println(ballCount);
+void toggleMagnet(bool on) {
+  if (on) {
+    analogWrite(magnet, 0);
+    ballSensed = true;
+  } else {
+    analogWrite(magnet, 255);
+  }
+}
+
+void playNote() {
+  static int ballCount = 0;
+  // increment and print ball count
+  ballCount += 1;
+  Serial.print("ball ");
+  Serial.println(ballCount);
+  if (musicEnabled) {
+    int size = sizeof(durations) / sizeof(int);
+    //to calculate the note duration, take one second divided by the note type.
+    //e.g. quarter note = 1000 / 4, eighth note = 1000/8, etc.
+    int duration = 1000 / durations[ballCount - 1];
+    tone(buzzer, notes[ballCount - 1], duration);
+
+    //to distinguish the notes, set a minimum time between them.
+    //the note's duration + 30% seems to work well:
+    int pauseBetweenNotes = duration * 1.30;
+    delay(pauseBetweenNotes);
+    
+    //stop the tone playing:
+    noTone(buzzer);
+    // ballSensed = false;
+    if (ballCount == size) {
+      ballCount = 0;
+    }
   }
 }
 
@@ -141,16 +194,16 @@ void updateBallCount() {
 */
 void onPerpetualMotionMachineChange()  {
   if (perpetualMotionMachine) {
-    attachInterrupt(digitalPinToInterrupt(sensor), magnetOn, FALLING);
+    attachInterrupt(digitalPinToInterrupt(sensor), sensorChanged, CHANGE);
     servo.write(80);
   } else {
     servo.write(180);
-    delay(1000);
+    delay(1000); // delay lets ball complete loop
     detachInterrupt(digitalPinToInterrupt(sensor));
   }
 }
 
-// TODO: impl
+// Don't do anything on music enabled change
 void onMusicEnabledChange() {
 
 }

@@ -9,3 +9,5 @@ The Pitches library is necessary to run the code. To use this library, add the .
 If using the Arduino Cloud IDE, use Pitches_Cloud.zip.
 
 Otherwise, use Pitches_Local.zip.
+
+You also might need to install the "ArduinoIoTCloud" library and all of it's dependencies through your IDE.
