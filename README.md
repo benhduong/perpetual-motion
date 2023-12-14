@@ -1,3 +1,3 @@
 # perpetual-motion
 
-code for arduino-powered perpetual motion machine.
+Code for arduino-powered perpetual motion machine.
