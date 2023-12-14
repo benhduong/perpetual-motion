@@ -1,5 +1,6 @@
+#include <Pitches.h>
 #include "thingProperties.h"
-#include "pitches.h"
+#include "perpetual-motion.h"
 
 #include <Servo.h>
 
@@ -85,7 +86,7 @@ void loop() {
   if (perpetualMotionMachine) {
     updateBallCount();
     
-    if (melody && ballSensed) {
+    if (musicEnabled && ballSensed) {
       // Add your code here to act upon Melody change
       int size = sizeof(durations) / sizeof(int);
       //to calculate the note duration, take one second divided by the note type.
@@ -108,6 +109,10 @@ void loop() {
     
     petWatchdog();
   }
+}
+
+state updateFSM(state curState, long mils, bool isOn, bool musicEnabled, bool sensorInput) {
+
 }
 
 void magnetOn() {
@@ -143,4 +148,9 @@ void onPerpetualMotionMachineChange()  {
     delay(1000);
     detachInterrupt(digitalPinToInterrupt(sensor));
   }
+}
+
+// TODO: impl
+void onMusicEnabledChange() {
+
 }
