@@ -1,6 +1,5 @@
 #include <Pitches.h>
 #include "thingProperties.h"
-#include "perpetual-motion.h"
 
 #include <Servo.h>
 
@@ -39,6 +38,8 @@ int durations[] = {
   4, 4, 4, 4,
   2, 2, 2
 };
+
+int ballCount = 0;
 
 void setup() {
   // Defined in thingProperties.h
@@ -145,6 +146,7 @@ state updateFSM(state curState, long mils, CloudSwitch isOn, bool ballSensed) {
     case sSYSTEM_OFF:
       if (isOn) {
         // 3-1: system toggled back on
+        ballCount = 0;
         nextState = sWAIT_FOR_BALL;
       }
   }
@@ -162,7 +164,6 @@ void toggleMagnet(bool on) {
 }
 
 void playNote() {
-  static int ballCount = 0;
   // increment and print ball count
   ballCount += 1;
   Serial.print("ball ");
