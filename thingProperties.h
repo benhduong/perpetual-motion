@@ -17,3 +17,17 @@ void initProperties() {
 }
 
 WiFiConnectionHandler ArduinoIoTPreferredConnection(SSID, PASS);
+
+typedef enum {
+  sWAIT_FOR_BALL = 1,
+  sELECTROMAGNET_ON = 2,
+  sSYSTEM_OFF = 3,
+} state;
+
+struct test {
+  state in;
+  state out;
+  long mils;
+  CloudSwitch isOn;
+  bool ballSensed;
+};
