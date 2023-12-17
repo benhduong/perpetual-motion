@@ -212,10 +212,6 @@ void onMusicEnabledChange() {
 test testList[] = {};
 int numTests = 0;
 
-state updateFSM(state curState, long mils, CloudSwitch isOn, bool ballSensed) {
-  return curState;
-}
-
 bool testUpdateFSM(struct test tl[]) {
   for (int i = 0; i < numTests; i++) {
     test currentTest = tl[i];
