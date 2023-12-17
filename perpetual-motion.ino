@@ -1,4 +1,4 @@
-#include <pitches.h>
+#include <Pitches.h>
 #include "thingProperties.h"
 
 #include <Servo.h>
@@ -16,7 +16,6 @@ Servo servo;
 // reflects if the inductive sensor detected a ball (T == detected; F == no detection)
 static volatile bool ballSensed = false;
 
-// FSM States
 int notes[] = {
   NOTE_B4, NOTE_A4, NOTE_G4, 
   NOTE_B4, NOTE_A4, NOTE_G4, 
@@ -203,7 +202,8 @@ void onMusicEnabledChange() {
 
 }
 
-test testList[] = {};
+
+test testList[] = {{sWAIT_FOR_BALL, sELECTROMAGNET_ON, 1000, mockIsOn = true, false}};
 int numTests = 0;
 
 bool testUpdateFSM(struct test tl[]) {
