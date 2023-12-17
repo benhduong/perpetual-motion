@@ -1,4 +1,4 @@
-#include <Pitches.h>
+#include <pitches.h>
 #include "thingProperties.h"
 
 #include <Servo.h>
@@ -17,12 +17,6 @@ Servo servo;
 static volatile bool ballSensed = false;
 
 // FSM States
-typedef enum {
-  sWAIT_FOR_BALL = 1,
-  sELECTROMAGNET_ON = 2,
-  sSYSTEM_OFF = 3,
-} state;
-
 int notes[] = {
   NOTE_B4, NOTE_A4, NOTE_G4, 
   NOTE_B4, NOTE_A4, NOTE_G4, 
