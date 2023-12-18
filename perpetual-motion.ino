@@ -1,4 +1,4 @@
-#include <Pitches.h>
+#include <pitches.h>
 #include "thingProperties.h"
 
 #include <Servo.h>
@@ -34,6 +34,35 @@ int durations[] = {
 
 int ballCount = 0;
 
+test testList[] = {
+// mils does not matter but they do set savedClock for following tests
+{sWAIT_FOR_BALL, sSYSTEM_OFF, 1000, mockIsOn = false, false},
+{sWAIT_FOR_BALL, sSYSTEM_OFF, 1000, mockIsOn = false, true},
+{sWAIT_FOR_BALL, sWAIT_FOR_BALL, 1000, mockIsOn = true, false},
+// savedClock = 1000, set by previous mils, booleans do not matter
+{sELECTROMAGNET_ON, sWAIT_FOR_BALL, 2000, mockIsOn = true, true},
+// mils, ballSensed do not matter
+{sSYSTEM_OFF, sWAIT_FOR_BALL, 1000, mockIsOn = true, true},
+{sSYSTEM_OFF, sSYSTEM_OFF, 1000, mockIsOn = false, true}};
+
+int numTests = 6;
+
+bool testUpdateFSM(struct test tl[]) {
+  int passed = 0;
+  for (int i = 0; i < numTests; i++) {
+    test currentTest = tl[i];
+    Serial.print("test ");
+    Serial.println(i + 1);
+    if (updateFSM(currentTest.in, currentTest.mils, currentTest.isOn, currentTest.ballSensed) != currentTest.out) {
+      Serial.println(updateFSM(currentTest.in, currentTest.mils, currentTest.isOn, currentTest.ballSensed));
+      Serial.println("FAILED");
+    } else {
+      passed = passed + 1;
+    }
+  }
+  return passed == numTests;
+}
+
 void setup() {
   // Defined in thingProperties.h
   initProperties();
@@ -51,12 +80,14 @@ void setup() {
 
   pinMode(buzzer, OUTPUT);
   
-  setupWatchdog();
+  //setupWatchdog();
 
   // init serial monitor
   Serial.begin(9600);
   while(!Serial);
   Serial.println("system ready");
+  Serial.println("tests");
+  Serial.println(testUpdateFSM(testList));
 }
 
 // Note: code taken from lab 4
@@ -103,24 +134,26 @@ void sensorChanged() {
   }
 }
 
+boolean myIsOn = false;
 void loop() {
-  static state CURRENT_STATE = sWAIT_FOR_BALL;
-  // update inputs from cloud
-  ArduinoCloud.update();
-  updateFSM(CURRENT_STATE, millis(), perpetualMotionMachine, ballSensed);   
-  petWatchdog();
+  // static state CURRENT_STATE = sWAIT_FOR_BALL;
+  // // update inputs from cloud
+  // ArduinoCloud.update();
+  // myIsOn = isOn;
+  // updateFSM(CURRENT_STATE, millis(), perpetualMotionMachine, ballSensed);   
+  // petWatchdog();
 }
 
-state updateFSM(state curState, long mils, CloudSwitch isOn, bool ballSensed) {
+state updateFSM(state curState, long mils, boolean myIsOn, bool ballSensed) {
   static long savedClock = mils;
-  state nextState;
+  state nextState = curState;
   switch(curState) {
     case sWAIT_FOR_BALL:
-      if (!isOn) {
+      if (!myIsOn) {
         // 1-3: turn system off
         nextState = sSYSTEM_OFF;
       }
-      if (ballSensed && isOn) {
+      else if (ballSensed && myIsOn) {
         // 1-2: ball sensed, turn magnet on
         // turn magnet on
         toggleMagnet(true);
@@ -137,13 +170,12 @@ state updateFSM(state curState, long mils, CloudSwitch isOn, bool ballSensed) {
         nextState = sWAIT_FOR_BALL;
       }
     case sSYSTEM_OFF:
-      if (isOn) {
+      if (myIsOn) {
         // 3-1: system toggled back on
         ballCount = 0;
         nextState = sWAIT_FOR_BALL;
       }
   }
-
   return nextState;
 }
 
@@ -200,19 +232,4 @@ void onPerpetualMotionMachineChange()  {
 // Don't do anything on music enabled change
 void onMusicEnabledChange() {
 
-}
-
-
-test testList[] = {{sWAIT_FOR_BALL, sELECTROMAGNET_ON, 1000, mockIsOn = true, false}};
-int numTests = 0;
-
-bool testUpdateFSM(struct test tl[]) {
-  for (int i = 0; i < numTests; i++) {
-    test currentTest = tl[i];
-
-    if (updateFSM(currentTest.in, currentTest.mils, currentTest.isOn, currentTest.ballSensed) != currentTest.out) {
-      return false;
-    }
-  }
-  return true;
 }
